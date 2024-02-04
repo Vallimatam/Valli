@@ -1,0 +1,28 @@
+//Find city temperature
+
+#include <stdio.h>
+#include <stdlib.h>
+
+void main()
+{
+	char city_name[30], url[300], weather_data[500];
+	printf("Enter a city name: ");
+	scanf("%s", city_name);
+	sprintf(url, "%s%s%s", "curl \"https://api.openweathermap.org/data/2.5/weather?q=", city_name, "&appid=abe3a0f4d0b6cebfbe7393b4b4e3aa28&units=metric\" > weather1.txt");
+	printf("%s", url);
+	system(url);
+	FILE *fp_weather = fopen("weather1.txt", "r");
+	fgets(weather_data, sizeof(weather_data), fp_weather);
+    char *token = strtok(weather_data, "\"");
+
+    while (token != NULL) 
+    {
+        if (strcmp(token, "temp") == 0) 
+        {
+            token = strtok(NULL, ":,");
+            printf("Temperature of %s : %s\n",city_name, token);
+            break;
+        }
+        token = strtok(NULL, "\"");
+    }
+}
