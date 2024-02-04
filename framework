@@ -1,0 +1,322 @@
+// CRUDS framework program
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAXFIELDVALUELENGTH 20
+#define MAXFIELDNAMELENGTH 100
+#define OPERATIONLENGTH 10
+#define FIELDSFILE "fields.cfg"
+#define MENUFILE "menu.cfg"
+#define DATAFILE "framework.dat"
+
+FILE *fpFramworkRead, *fpFramworkWrite, *fpFields, *fpMenu, *fpCustomizemsg;
+char fieldValue[MAXFIELDVALUELENGTH], fieldName[MAXFIELDNAMELENGTH];
+char **fieldNames, targetRecordId[MAXFIELDVALUELENGTH], updatedValue[MAXFIELDVALUELENGTH], operation[OPERATIONLENGTH];
+int countOfFields;
+
+void showMenu();
+char **getFieldsArray();
+int getFieldsCount();
+char **getRecordDetails();
+void createNewRecord(char **);
+int getRecordsCount();
+void showAllRecords();
+char *getTargetRecordId(int choice);
+long int getTargetRecordPosition(char *);
+char *getUpdatedFieldValue();
+void printStatusMessage();
+void updateRecord(char *);
+void deleteRecord(char *);
+void searchRecord(char *);
+
+void main()
+{
+	fpFields = fopen(FIELDSFILE, "r");
+	countOfFields = getFieldsCount();
+	fieldNames = getFieldsArray();
+	do
+	{
+		showMenu();
+	} while (1);
+}
+
+int getFieldsCount()
+{
+	int fieldsCounter = 0;
+	while (fgets(fieldName, sizeof(fieldName), fpFields))
+	{
+		fieldsCounter++;
+	}
+	return fieldsCounter;
+}
+
+char** getFieldsArray()
+{
+	int fieldsCounter;
+	rewind(fpFields);
+	fieldNames = (char **)malloc(countOfFields * sizeof(char *));
+	for (fieldsCounter = 0; fieldsCounter < countOfFields; fieldsCounter++)
+	{
+		fieldNames[fieldsCounter] = malloc(MAXFIELDNAMELENGTH);
+		fgets(fieldName, sizeof(fieldName), fpFields);
+		int fieldNameLength = strlen(fieldName);
+		fieldName[fieldNameLength - 1] = '\0';
+		strcpy(fieldNames[fieldsCounter], fieldName);
+	}
+	return fieldNames;
+}
+
+void showMenu()
+{
+	int menuSize, choice;
+	fpMenu = fopen(MENUFILE, "rb");
+	fseek(fpMenu, 0, SEEK_END);
+	menuSize = ftell(fpMenu);
+	fseek(fpMenu, 0, SEEK_SET);
+	char menu[menuSize];
+	fread(&menu, sizeof(menu), 1, fpMenu);
+	fwrite(&menu, sizeof(menu), 1, stdout);
+	fclose(fpMenu);
+
+	printf("Enter your choice: ");
+	scanf("%d", &choice);
+
+	switch (choice)
+	{
+		case 1: createNewRecord(getRecordDetails());
+			break;
+		case 2: showAllRecords();
+			break;
+		case 3: updateRecord(getTargetRecordId(choice));
+			break;
+		case 4: deleteRecord(getTargetRecordId(choice));
+			break;
+		case 5: searchRecord(getTargetRecordId(choice));
+			break;
+		case 6: printf("You chose exit. Thank you.\n");
+				fclose(fpFields);
+				exit(0);
+		default: printf("You entered an invalid choice.\n");
+	}
+}
+
+char** getRecordDetails()
+{
+	int counter;
+	char **fieldValues = (char **)malloc(countOfFields * sizeof(char *));
+	for (counter = 0; counter < countOfFields; counter++)
+	{
+		fieldValues[counter] = malloc(MAXFIELDVALUELENGTH);
+		if (counter == 0)
+		{
+			strcpy(fieldValue, "a");
+			strcpy(fieldValues[counter], fieldValue);
+			continue;
+		}
+
+		printf("Enter %s: ", fieldNames[counter]);
+		scanf("%s", fieldValues[counter]);
+	}
+	return fieldValues;
+}
+
+void createNewRecord(char **fieldValues)
+{
+	printf("hi\n");
+	int counter;
+	fpFramworkWrite = fopen(DATAFILE, "a");
+	for (counter = 0; counter < countOfFields; counter++)
+	{
+		strcpy(fieldValue, fieldValues[counter]);
+		fwrite(fieldValue, sizeof(fieldValue), 1, fpFramworkWrite);
+	}
+	fclose(fpFramworkWrite);
+}
+
+int getRecordsCount()
+{
+	fpFramworkRead = fopen(DATAFILE, "r");
+	fseek(fpFramworkRead, 0, SEEK_END);
+	int fileSize = ftell(fpFramworkRead);
+	int recordsCount = fileSize / (countOfFields * MAXFIELDVALUELENGTH);
+	fclose(fpFramworkRead);
+	return recordsCount;
+}
+
+void showAllRecords()
+{
+	int counter, recordsCounter;
+	int recordsCount = getRecordsCount();
+	if (recordsCount < 1)
+	{
+		printf("No records found.\n"); // No records found message function.
+	}
+	else
+	{
+		printf("All records: \n");
+		printf("---------------------------------\n");
+
+		fpFramworkRead = fopen(DATAFILE, "r");
+		for (recordsCounter = 0; recordsCounter < recordsCount; recordsCounter++)
+		{
+			for (counter = 0; counter < countOfFields; counter++)
+			{
+				fread(fieldValue, sizeof(fieldValue), 1, fpFramworkRead);
+				if (counter == 0)
+				{
+					if (strcmp(fieldValue, "d") == 0)
+					{
+						fseek(fpFramworkRead, (countOfFields - 1) * MAXFIELDVALUELENGTH, SEEK_CUR);
+						break;
+					}
+					continue;
+				}
+				printf("%s: %s\n", fieldNames[counter], fieldValue);
+			}	
+			printf("---------------------------------\n");
+		}
+	}
+}
+
+long int getTargetRecordPosition(char *targetRecordId)
+{
+	long int targetRecordPosition = -1;
+	int recordsCounter, counter;
+	int recordsCount = getRecordsCount();
+	fpFramworkRead = fopen(DATAFILE, "r");
+	for (recordsCounter = 0; recordsCounter < recordsCount; recordsCounter++)
+	{
+		fread(fieldValue, sizeof(fieldValue), 1, fpFramworkRead);
+		if (strcmp(fieldValue, "a") == 0)
+		{
+		    fread(fieldValue, sizeof(fieldValue), 1, fpFramworkRead);
+			if (strcmp(fieldValue, targetRecordId) == 0)
+			{
+				fseek(fpFramworkRead, - (MAXFIELDVALUELENGTH * 2), SEEK_CUR);
+				targetRecordPosition = ftell(fpFramworkRead);
+				break;
+			}
+			else
+			{
+				fseek(fpFramworkRead, MAXFIELDVALUELENGTH * (countOfFields - 2), SEEK_CUR);
+			}
+		}
+	}
+	return targetRecordPosition;
+}
+
+char *getUpdatedFieldValue()
+{
+	printf("Enter new %s: ", fieldNames[countOfFields - 1]);
+	scanf("%s", updatedValue);
+	return updatedValue;
+}
+
+char *getTargetRecordId(int choice)
+{
+	printf("Enter %s ", fieldNames[1]);
+	if (choice == 3)
+	{
+		printf("to update: ");
+	}
+	else if (choice == 4)
+	{
+		printf("to delete: ");
+	}
+	else
+	{
+		printf("to search: ");
+	}
+	scanf("%s", targetRecordId);
+	return targetRecordId;
+}
+
+int update(char *targetRecordId, char operation[])
+{
+	int isFound;
+	long int targetRecordPosition = getTargetRecordPosition(targetRecordId);
+	if (targetRecordPosition != -1)
+	{
+		isFound = 1;
+		fpFramworkWrite = fopen(DATAFILE, "r+");
+		fseek(fpFramworkWrite, targetRecordPosition, SEEK_SET);
+		if (strcmp(operation, "delete") == 0)
+		{
+			fread(fieldValue, sizeof(fieldValue), 1, fpFramworkWrite);
+			fseek(fpFramworkWrite, - MAXFIELDVALUELENGTH, SEEK_CUR);
+			strcpy(fieldValue, "d");
+		}
+		else
+		{
+			fseek(fpFramworkWrite, (countOfFields - 1) * MAXFIELDVALUELENGTH, SEEK_CUR);
+			strcpy(fieldValue, getUpdatedFieldValue());
+		}
+		fwrite(fieldValue, sizeof(fieldValue), 1, fpFramworkWrite);
+		fclose(fpFramworkWrite);
+	}
+	else
+	{
+		isFound = 0;
+	}
+	return isFound;
+}
+
+void printStatusMessage(int isFound, char *targetRecordId, char operation[])
+{
+	if (isFound == 0)
+	{
+		printf("Record details not found with id %s.\n", targetRecordId);
+	}
+	else
+	{
+		printf("Record %sd successfully.\n", operation);
+	}
+}
+
+void updateRecord(char *targetRecordId)
+{
+	char operation[OPERATIONLENGTH] = "update";
+	int isFound = update(targetRecordId, operation);
+	printStatusMessage(isFound, targetRecordId, operation);
+}
+
+void deleteRecord(char *targetRecordId)
+{
+	char operation[OPERATIONLENGTH] = "delete";
+	int isFound = update(targetRecordId, operation);
+	printStatusMessage(isFound, targetRecordId, operation);
+}
+
+void printSearchRecord(long int targetRecordPosition)
+{
+	int fieldsCounter;
+	fpFramworkRead = fopen(DATAFILE, "r");
+	fseek(fpFramworkRead, targetRecordPosition, SEEK_SET);
+	printf("Record details: \n");
+
+	for (fieldsCounter = 0; fieldsCounter < countOfFields; fieldsCounter++)
+	{
+		fread(fieldValue, sizeof(fieldValue), 1, fpFramworkRead);
+		if (fieldsCounter == 0)
+		{
+			continue;
+		}
+		printf("%s: %s\n", fieldNames[fieldsCounter], fieldValue);
+	}
+	printf("-----------------------------------\n");
+}
+
+void searchRecord(char *targetRecordId)
+{
+	long int targetRecordPosition = getTargetRecordPosition(targetRecordId);
+	if (targetRecordPosition != -1)
+	{
+		printSearchRecord(targetRecordPosition);
+	}
+	else
+	{
+		printf("Record not found with id %s.\n", targetRecordId);
+	}
+}
